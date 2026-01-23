@@ -38,28 +38,52 @@ export const VoiceProvider = ({ children }) => {
     const sendAudioToServer = async (mimeType = 'audio/webm') => {
         try {
             const blob = new Blob(chunksRef.current, { type: mimeType });
-            // Very small files are probably noise
-            if (blob.size < 1000) return;
+            console.log(`Sending Audio: ${blob.size} bytes, Type: ${mimeType}`);
+
+            // Lower threshold to 100 bytes to catch short commands
+            if (blob.size < 100) {
+                console.log("Audio too short/empty, ignoring.");
+                return;
+            }
 
             const formData = new FormData();
-            // Use correct extension for backend MIME sniffing if possible, though backend detects content
             const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
             formData.append('audio', blob, `command.${ext}`);
 
+            setStatus("Sending...");
             const response = await fetch('/api/transcribe', {
                 method: 'POST',
                 body: formData
             });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                console.error("Server Error:", errText);
+                setStatus("Error");
+                // Alert the user only if it's a critical failure during manual mode
+                if (status.includes("Manual")) alert(`Voice Error: ${response.statusText}\n${errText}`);
+                return;
+            }
+
             const data = await response.json();
+
+            if (data.error) {
+                console.error("API Error:", data.error);
+                setStatus("Error");
+                return;
+            }
 
             if (data.text) {
                 console.log("Server Transcript:", data.text);
                 setTranscript(data.text);
+            } else {
+                console.log("No text transcribed");
             }
         } catch (e) {
             console.error("Transcription Failed", e);
+            setStatus("Conn Error");
         } finally {
-            setStatus("Listening...");
+            if (!status.includes("Error")) setStatus("Listening...");
         }
     };
 

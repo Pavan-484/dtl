@@ -94,9 +94,11 @@ def transcribe_endpoint():
         print("Transcribing audio (Direct API)...")
         
         # Determine mime type (default to audio/wav, but browser sends webm usually)
-        mime_type = "audio/wav"
+        mime_type = "audio/webm"
         if audio_file.filename.endswith('.webm'):
             mime_type = "audio/webm"
+        elif audio_file.filename.endswith('.mp4'):
+             mime_type = "audio/mp4"
         
         # Build prompt
         prompt = "Listen to this audio commands and transcribe exactly what is said. Output ONLY the text."
