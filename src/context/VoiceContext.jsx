@@ -35,14 +35,16 @@ export const VoiceProvider = ({ children }) => {
         window.speechSynthesis.speak(utterance);
     };
 
-    const sendAudioToServer = async () => {
+    const sendAudioToServer = async (mimeType = 'audio/webm') => {
         try {
-            const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+            const blob = new Blob(chunksRef.current, { type: mimeType });
             // Very small files are probably noise
             if (blob.size < 1000) return;
 
             const formData = new FormData();
-            formData.append('audio', blob, 'command.webm');
+            // Use correct extension for backend MIME sniffing if possible, though backend detects content
+            const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+            formData.append('audio', blob, `command.${ext}`);
 
             const response = await fetch('/api/transcribe', {
                 method: 'POST',
@@ -80,7 +82,7 @@ export const VoiceProvider = ({ children }) => {
             // Update Visualizer
             setAudioLevel(average);
 
-            const SPEECH_THRESHOLD = 20;
+            const SPEECH_THRESHOLD = 5; // Lowered from 20 to 5 for better sensitivity
             const SILENCE_DURATION = 1500;
 
             // Only record if system isn't speaking (to avoid self-trigger)
@@ -119,29 +121,51 @@ export const VoiceProvider = ({ children }) => {
     const startListening = async () => {
         if (listening) return;
         setListening(true);
-        setStatus("Listening...");
+        setStatus("Starting...");
 
         try {
+            // Ensure context is running (fixes "suspended" state in some browsers)
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioContextClass();
+            if (ctx.state === 'suspended') {
+                await ctx.resume();
+            }
+            audioContextRef.current = ctx;
+
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
-            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioContextRef.current.createMediaStreamSource(stream);
-            const analyser = audioContextRef.current.createAnalyser();
+
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
             analyser.fftSize = 512;
             source.connect(analyser);
             analyserRef.current = analyser;
 
-            mediaRecorderRef.current = new MediaRecorder(stream);
+            // Determine supported mime type
+            let mimeType = 'audio/webm';
+            if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                mimeType = 'audio/webm;codecs=opus';
+            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                mimeType = 'audio/mp4'; // Safari fallback
+            }
+
+            console.log(`Using MimeType: ${mimeType}`);
+
+            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
             mediaRecorderRef.current.ondataavailable = (e) => {
                 if (e.data.size > 0) chunksRef.current.push(e.data);
             };
-            mediaRecorderRef.current.onstop = sendAudioToServer;
 
+            // Pass the mimeType to the sender so it prepares the Blob correctly
+            mediaRecorderRef.current.onstop = () => sendAudioToServer(mimeType);
+
+            setStatus("Listening...");
             // Start logic
             detectVoiceActivity();
         } catch (err) {
             console.error("Mic Error:", err);
-            speak("Microphone access denied.");
+            setStatus("Mic Error");
+            speak("Microphone access denied or error.");
         }
     };
 
