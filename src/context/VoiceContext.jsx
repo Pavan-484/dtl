@@ -20,18 +20,105 @@ export const VoiceProvider = ({ children }) => {
     const isRecordingRef = useRef(false);
     const streamRef = useRef(null);
 
-    // Speak function
-    const speak = (text) => {
+    // Audio playing queue to prevent overlaps
+    const audioQueueRef = useRef([]);
+    const currentAudioRef = useRef(null);
+    const lastSpokenTextRef = useRef('');
+    const lastSpokenTimeRef = useRef(0);
+
+    // Speak function using OpenAI TTS API (much more reliable than browser TTS)
+    const speak = async (text) => {
+        if (!text) return;
+
+        // Prevent duplicate TTS within 2 seconds
+        const now = Date.now();
+        if (text === lastSpokenTextRef.current && (now - lastSpokenTimeRef.current) < 2000) {
+            console.log("🔇 Skipping duplicate TTS:", text.substring(0, 30));
+            return;
+        }
+
+        lastSpokenTextRef.current = text;
+        lastSpokenTimeRef.current = now;
+
+        console.log("🔊 TTS Request (OpenAI):", text);
         setIsSystemSpeaking(true);
+
+        try {
+            // Stop any ongoing audio
+            if (currentAudioRef.current) {
+                currentAudioRef.current.pause();
+                currentAudioRef.current = null;
+            }
+
+            // Call backend TTS API
+            const response = await fetch('/api/speak', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok) {
+                throw new Error(`TTS API failed: ${response.statusText}`);
+            }
+
+            // Get audio blob
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            // Create and play audio
+            const audio = new Audio(audioUrl);
+            currentAudioRef.current = audio;
+
+            audio.onplay = () => {
+                console.log("🔊 TTS Started (OpenAI):", text.substring(0, 50));
+            };
+
+            audio.onended = () => {
+                console.log("🔊 TTS Finished");
+                setIsSystemSpeaking(false);
+                URL.revokeObjectURL(audioUrl);
+                currentAudioRef.current = null;
+            };
+
+            audio.onerror = (e) => {
+                console.error("🔊 Audio Playback Error:", e);
+                setIsSystemSpeaking(false);
+                URL.revokeObjectURL(audioUrl);
+                currentAudioRef.current = null;
+            };
+
+            await audio.play();
+
+        } catch (error) {
+            console.error("🔊 TTS Error:", error);
+            setIsSystemSpeaking(false);
+
+            // Fallback to browser TTS if API fails
+            console.log("Falling back to browser TTS...");
+            fallbackToBrowserTTS(text);
+        }
+    };
+
+    // Fallback function using browser TTS
+    const fallbackToBrowserTTS = (text) => {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         const voices = window.speechSynthesis.getVoices();
-        const preferredVoice = voices.find(v => v.name.includes("US English") || v.name.includes("Samantha"));
+        const preferredVoice = voices.find(v =>
+            v.lang.startsWith('en') && (
+                v.name.includes("Google") ||
+                v.name.includes("Samantha") ||
+                v.name.includes("Natural")
+            )
+        ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+
         if (preferredVoice) utterance.voice = preferredVoice;
         utterance.rate = 1.0;
-        utterance.onend = () => {
-            setIsSystemSpeaking(false);
-        };
+        utterance.onend = () => setIsSystemSpeaking(false);
+        utterance.onerror = () => setIsSystemSpeaking(false);
+
         window.speechSynthesis.speak(utterance);
     };
 
@@ -217,6 +304,29 @@ export const VoiceProvider = ({ children }) => {
     };
 
     const resetTranscript = () => setTranscript('');
+
+    // Preload voices on mount
+    useEffect(() => {
+        // Force voice loading
+        const loadVoices = () => {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                console.log("✅ TTS Voices loaded on mount:", voices.length);
+            }
+        };
+
+        // Load immediately
+        loadVoices();
+
+        // Some browsers need this event
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        // Fallback: try again after delay
+        setTimeout(loadVoices, 500);
+        setTimeout(loadVoices, 1500);
+    }, []);
 
     // Trigger detect loop when listening state changes
     useEffect(() => {

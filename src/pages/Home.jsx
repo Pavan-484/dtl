@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVoice } from '../context/VoiceContext';
 import { FileText, Users, Map, Eye } from 'lucide-react';
@@ -6,9 +6,13 @@ import { FileText, Users, Map, Eye } from 'lucide-react';
 const Home = () => {
     const { speak } = useVoice();
     const navigate = useNavigate();
+    const hasSpokenRef = useRef(false);
 
     useEffect(() => {
-        speak("Welcome. Please say a command like 'Go to Form', or 'Read Sign'.");
+        if (!hasSpokenRef.current) {
+            speak("Welcome. Please say a command like 'Go to Form', or 'Read Sign'.");
+            hasSpokenRef.current = true;
+        }
     }, []); // Run once on mount
 
     const modules = [

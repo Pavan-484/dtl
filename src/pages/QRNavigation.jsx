@@ -14,10 +14,14 @@ const QRNavigation = () => {
     const [data, setData] = useState('Scanning...');
     const scannerRef = useRef(null);
     const lastScanTime = useRef(0);
+    const hasSpokenRef = useRef(false);
     const SCAN_COOLDOWN = 5000; // 5 seconds
 
     useEffect(() => {
-        speak("Navigation Mode. Scanning for QR codes.");
+        if (!hasSpokenRef.current) {
+            speak("Navigation Mode. Scanning for QR codes.");
+            hasSpokenRef.current = true;
+        }
 
         const html5QrCode = new Html5Qrcode("reader");
         scannerRef.current = html5QrCode;

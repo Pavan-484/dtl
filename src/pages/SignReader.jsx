@@ -9,9 +9,13 @@ const SignReader = () => {
     const [processing, setProcessing] = useState(false);
     const [text, setText] = useState('');
     const [image, setImage] = useState(null);
+    const hasSpokenRef = useRef(false);
 
     useEffect(() => {
-        speak("Signboard Reader Active. Say 'Read This' to scan.");
+        if (!hasSpokenRef.current) {
+            speak("Signboard Reader Active. Say 'Read This' to scan.");
+            hasSpokenRef.current = true;
+        }
     }, []);
 
     useEffect(() => {

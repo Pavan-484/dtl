@@ -19,11 +19,15 @@ const VoiceForm = () => {
 
     // Timer to detect silence
     const silenceTimer = useRef(null);
+    const hasSpokenRef = useRef(false);
 
     // Initial welcome
     useEffect(() => {
-        speak("Opening Form. " + steps[0].question);
-        resetTranscript();
+        if (!hasSpokenRef.current) {
+            speak("Opening Form. " + steps[0].question);
+            resetTranscript();
+            hasSpokenRef.current = true;
+        }
     }, []);
 
     // Handle Transcript updates

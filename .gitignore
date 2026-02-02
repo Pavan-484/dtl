@@ -25,7 +25,10 @@ dist-ssr
 
 # Environment Variables
 .env
-.env.*
+.env.local
+.env.production
+.env.development
+!.env.example
 
 # Python
 __pycache__/
