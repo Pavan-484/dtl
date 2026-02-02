@@ -1,0 +1,7 @@
+flask
+flask-cors
+easyocr
+numpy
+opencv-python-headless
+python-dotenv
+requests
