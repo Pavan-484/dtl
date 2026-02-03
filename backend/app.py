@@ -177,6 +177,17 @@ def speak_endpoint():
 
 
 if __name__ == '__main__':
-    print("Starting Flask Server on Port 5001...")
+    # Get port from environment variable for production hosting
+    port = int(os.environ.get('PORT', 5001))
+    
+    print(f"Starting Flask Server on Port {port}...")
     print("Using OpenAI API for audio transcription and vision analysis")
-    app.run(debug=True, port=5001)
+    
+    # In production, disable debug and bind to 0.0.0.0
+    is_production = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER')
+    
+    app.run(
+        debug=not is_production,
+        host='0.0.0.0',  # Allow external connections
+        port=port
+    )

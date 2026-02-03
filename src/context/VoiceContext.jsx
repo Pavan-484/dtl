@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import regeneratorRuntime from "regenerator-runtime";
 
+// API Base URL - uses environment variable in production, defaults to proxy in development
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 const VoiceContext = createContext();
 
 export const useVoice = () => useContext(VoiceContext);
@@ -51,7 +54,7 @@ export const VoiceProvider = ({ children }) => {
             }
 
             // Call backend TTS API
-            const response = await fetch('/api/speak', {
+            const response = await fetch(`${API_BASE_URL}/api/speak`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -138,7 +141,7 @@ export const VoiceProvider = ({ children }) => {
             formData.append('audio', blob, `command.${ext}`);
 
             setStatus("Sending...");
-            const response = await fetch('/api/transcribe', {
+            const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
                 method: 'POST',
                 body: formData
             });

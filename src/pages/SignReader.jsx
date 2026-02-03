@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { useVoice } from '../context/VoiceContext';
 
+// API Base URL - uses environment variable in production
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 const SignReader = () => {
     const webcamRef = useRef(null);
     const { speak, transcript, resetTranscript } = useVoice();
@@ -50,7 +53,7 @@ const SignReader = () => {
             const base64Image = imageSrc.split(',')[1];
 
             // Use our secure backend endpoint
-            const response = await fetch('/api/analyze_sign', {
+            const response = await fetch(`${API_BASE_URL}/api/analyze_sign`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
